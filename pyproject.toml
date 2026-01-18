@@ -1,0 +1,17 @@
+[project]
+name = "shopping-assistant-agent"
+version = "0.1.0"
+description = "FastAPI + LangGraph + DSPy shopping assistant backend"
+requires-python = ">=3.12"
+dependencies = [
+  "anyio",
+  "boto3",
+  "dspy",
+  "fastapi",
+  "langgraph",
+  "mcp",
+  "pydantic",
+  "python-dotenv",
+  "uvicorn[standard]",
+]
+

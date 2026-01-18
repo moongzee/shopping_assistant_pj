@@ -30,6 +30,10 @@ frontend/dist/
 frontend/.env.local
 frontend/.env.*.local
 
+# --- uv / venv ---
+.venv/
+uv.lock
+
 # --- Backend runtime data (generated) ---
 # chat/feedback 로그 및 생성 데이터셋은 기본적으로 커밋하지 않음
 agent/data/logs/

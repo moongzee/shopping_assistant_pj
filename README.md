@@ -15,7 +15,8 @@
 ## 로컬 환경 세팅(처음부터)
 
 ### 0) 전제
-- **Python**: (현재 로컬에서는) `conda geo` 환경을 사용
+- **Python**: 3.12+ 권장
+- **uv**: 백엔드 의존성/가상환경은 `uv`로 관리
 - **Node.js**: 20+ 권장
 
 ---
@@ -26,8 +27,14 @@
 레포 루트(= `shopping_assistant/`)에서:
 
 ```bash
-conda activate geo
-pip install -r agent/requirements.txt
+# 1) uv 설치 (macOS/Homebrew 권장)
+brew install uv
+
+# (대안) 공식 설치 스크립트
+# curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2) venv + 의존성 설치 (pyproject.toml 기반)
+uv sync
 ```
 
 ### 1-2) 환경변수(.env)
@@ -53,7 +60,7 @@ pip install -r agent/requirements.txt
 ### 1-3) 백엔드 실행
 
 ```bash
-uvicorn agent.app.main:app --reload --port 8000
+uv run uvicorn agent.app.main:app --reload --port 8000
 ```
 
 #### 헬스체크
