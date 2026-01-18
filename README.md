@@ -266,7 +266,10 @@ docker compose -f docker-compose.yml up --build
 ```
 
 - 프론트: `http://localhost:3000`
-- 백엔드: `http://localhost:8000`
+- 백엔드: `http://localhost:8001` (호스트 8000 포트 충돌 방지)
+
+> 중요: Docker에서는 이미지에 `.env`를 포함하지 않으므로, **docker-compose가 `agent/.env`를 컨테이너 환경변수로 주입**하도록 구성되어 있습니다.  
+> 로컬 실행 시 `agent/.env`에 `DSPY_MODEL`, `AWS_*`, `MCP_*`를 채워주세요(`agent/env.example` 참고).
 
 ### 5-4) EKS(Pod) 배포 시 핵심 포인트
 - **환경변수/시크릿 주입**

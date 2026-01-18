@@ -21,6 +21,18 @@ from ..utils.sse import SseEvent, chunk_text, merge_updates
 
 router = APIRouter()
 
+def _has_aws_creds() -> bool:
+    # If any of these are present, boto3 has a good chance to resolve credentials.
+    if os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"):
+        return True
+    if os.getenv("AWS_PROFILE"):
+        return True
+    if os.getenv("AWS_WEB_IDENTITY_TOKEN_FILE"):
+        return True
+    if os.getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") or os.getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI"):
+        return True
+    return False
+
 
 def _bedrock_model_id() -> str:
     m = SETTINGS.dspy_model
@@ -135,6 +147,63 @@ async def chat_stream(req: ChatRequest):
             id=message_id,
         ).encode()
 
+        # UI에 즉시 반응이 보이도록 "요청 접수" 상태를 먼저 보냅니다.
+        yield SseEvent(
+            event="state",
+            data={
+                "session_id": req.session_id,
+                "message_id": message_id,
+                "node": "accepted",
+                "update_keys": [],
+            },
+            id=message_id,
+        ).encode()
+
+        # Fast-fail for common docker-compose misconfig (no AWS/DSPy env injected)
+        if not SETTINGS.dspy_model:
+            msg = (
+                "DSPY_MODEL이 설정되지 않았습니다. "
+                "docker-compose 사용 시 `agent/.env`에 DSPY_MODEL을 설정하세요."
+            )
+            yield SseEvent(
+                event="error",
+                data={
+                    "session_id": req.session_id,
+                    "message_id": message_id,
+                    "error": msg,
+                    "error_type": "ConfigError",
+                },
+                id=message_id,
+            ).encode()
+            yield SseEvent(event="done", data={"session_id": req.session_id, "message_id": message_id}, id=message_id).encode()
+            return
+
+        if not _has_aws_creds():
+            msg = (
+                "AWS 자격증명이 설정되지 않아 LLM 호출을 진행할 수 없습니다. "
+                "docker-compose 사용 시 `agent/.env`에 AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY(+AWS_REGION)를 설정하거나 "
+                "운영(EKS)에서는 IRSA 자격증명을 주입하세요."
+            )
+            # token으로도 보내 UI에 바로 표시되게 함
+            async for piece in chunk_text(msg, SETTINGS.stream_chunk_chars):
+                yield SseEvent(
+                    event="token",
+                    data={"session_id": req.session_id, "message_id": message_id, "delta": piece},
+                    id=message_id,
+                ).encode()
+            yield SseEvent(
+                event="error",
+                data={
+                    "session_id": req.session_id,
+                    "message_id": message_id,
+                    "error": msg,
+                    "error_type": "AuthError",
+                },
+                id=message_id,
+            ).encode()
+            yield SseEvent(event="done", data={"session_id": req.session_id, "message_id": message_id}, id=message_id).encode()
+            return
+
         state: Dict[str, Any] = {}
         graph_input = {"user_query": req.user_query}
         config = {"configurable": {"thread_id": req.session_id}}
@@ -171,6 +240,12 @@ async def chat_stream(req: ChatRequest):
                         prompt = state["api_response"].get("composer_prompt")
                         if isinstance(prompt, str) and prompt.strip():
                             try:
+                                if not _has_aws_creds():
+                                    raise RuntimeError(
+                                        "AWS 자격증명이 설정되지 않았습니다. "
+                                        "docker-compose 사용 시 `.env`에 AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY(+AWS_REGION) "
+                                        "또는 EKS(IRSA) 자격증명을 주입하세요."
+                                    )
                                 send, recv = anyio.create_memory_object_stream[str](max_buffer_size=200)
                                 # producer runs in background thread and pushes deltas into `send`
                                 async with recv:
@@ -201,7 +276,10 @@ async def chat_stream(req: ChatRequest):
                                     pass
                             except Exception:
                                 # fallback: 스트리밍 실패 시, 빈 응답 방지용(간단 chunk)
-                                fallback_text = "추천을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+                                fallback_text = (
+                                    "추천을 생성하는 중 오류가 발생했습니다. "
+                                    "환경변수(AWS/DSPY_MODEL 등) 설정을 확인한 뒤 다시 시도해 주세요."
+                                )
                                 async for piece in chunk_text(
                                     fallback_text, SETTINGS.stream_chunk_chars
                                 ):

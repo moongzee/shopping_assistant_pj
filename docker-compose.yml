@@ -6,13 +6,19 @@ services:
       context: .
       dockerfile: agent/Dockerfile
     ports:
-      - "8000:8000"
+      - "8001:8000"
+    env_file:
+      # 로컬에서는 `agent/.env`에 AWS/DSPY/MCP 값을 넣어주세요.
+      # (이미지에 .env를 COPY 하지 않으므로, 도커 실행 시 주입이 필요합니다)
+      - agent/.env
     environment:
       # 필수/권장 값들은 EKS에서는 Secret/ConfigMap으로 주입하세요.
       # 로컬에서는 레포 루트 또는 agent/.env 를 사용해도 됩니다.
       FRONTEND_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
       # AGENT_DATA_DIR을 컨테이너 볼륨에 매핑하면 로그/데이터셋이 지속됩니다.
       AGENT_DATA_DIR: "/data"
+      # 로컬 docker에서 AWS 자격증명이 없으면 boto3가 EC2 메타데이터를 조회하며 멈춘 것처럼 보일 수 있어 비활성화합니다.
+      AWS_EC2_METADATA_DISABLED: "true"
     volumes:
       - backend_data:/data
 
@@ -25,6 +31,7 @@ services:
     environment:
       AGENT_BASE_URL: "http://backend:8000"
       # 백엔드에서 ADMIN_API_KEY를 설정했다면 동일하게 설정
+      NEXT_PUBLIC_AGENT_BASE_URL: "http://backend:8000"
       ADMIN_API_KEY: ""
     depends_on:
       - backend

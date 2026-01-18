@@ -36,9 +36,18 @@ LOADED_DOTENV_FILES: List[str] = []
 _load_dotenv()
 
 
-def _env(name: str, default: str) -> str:
+def _env(name: str, default: str | None = "") -> str:
+    """
+    Read env var. If unset/empty, return `default`.
+
+    - `default` can be omitted (defaults to empty string) so callers can mark
+      values as "optional" without repeating `""` everywhere.
+    """
     v = os.getenv(name)
-    return default if v is None or v == "" else v
+    if v is None or v == "":
+        # If default is explicitly None, treat as empty string to keep import-time safe.
+        return "" if default is None else default
+    return v
 
 
 def _env_list(name: str, default: List[str]) -> List[str]:

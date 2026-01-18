@@ -115,7 +115,11 @@ export default function ChatClient() {
     });
 
     try {
-      const directBase = (process.env.NEXT_PUBLIC_AGENT_BASE_URL || "").trim();
+      // IMPORTANT:
+      // - 기본값은 Next API 프록시(`/api/chat/stream`) 사용 (Docker/배포 환경에서 안전)
+      // - "직접 백엔드 호출"은 명시적으로 켠 경우에만 사용 (프록시 버퍼링 회피 목적)
+      const useDirect = String(process.env.NEXT_PUBLIC_USE_DIRECT_BACKEND || "").trim() === "true";
+      const directBase = useDirect ? (process.env.NEXT_PUBLIC_AGENT_BASE_URL || "").trim() : "";
       const url = directBase ? `${directBase}/v1/chat/stream` : "/api/chat/stream";
       const res = await fetch(url, {
         method: "POST",
