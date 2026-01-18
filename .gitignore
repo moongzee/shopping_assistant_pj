@@ -1,0 +1,41 @@
+# --- OS / Editor ---
+.DS_Store
+.idea/
+.vscode/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- Jupyter / local scratch ---
+*.ipynb_checkpoints
+
+# --- Env / Secrets ---
+.env
+.env.*
+*.env
+*.env.*
+
+# --- Frontend (Next.js) ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+
+# --- Backend runtime data (generated) ---
+# chat/feedback 로그 및 생성 데이터셋은 기본적으로 커밋하지 않음
+agent/data/logs/
+agent/data/datasets/
+agent/data/curation/
+
+# --- DSPy artifacts (generated) ---
+agent/artifacts/
+

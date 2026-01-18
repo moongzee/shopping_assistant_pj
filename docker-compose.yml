@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # 필수/권장 값들은 EKS에서는 Secret/ConfigMap으로 주입하세요.
+      # 로컬에서는 레포 루트 또는 agent/.env 를 사용해도 됩니다.
+      FRONTEND_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      # AGENT_DATA_DIR을 컨테이너 볼륨에 매핑하면 로그/데이터셋이 지속됩니다.
+      AGENT_DATA_DIR: "/data"
+    volumes:
+      - backend_data:/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      AGENT_BASE_URL: "http://backend:8000"
+      # 백엔드에서 ADMIN_API_KEY를 설정했다면 동일하게 설정
+      ADMIN_API_KEY: ""
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
+

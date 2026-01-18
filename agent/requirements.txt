@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+anyio
+langgraph
+dspy
+mcp
+pydantic
+python-dotenv
+boto3
