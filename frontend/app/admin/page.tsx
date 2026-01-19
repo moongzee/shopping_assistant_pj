@@ -198,7 +198,7 @@ export default function AdminPage() {
         </Link>
       </div>
 
-      <div className="grid">
+      <div className="grid gridEqual">
         <div className="panel">
           <div className="panelHeader">
             <div className="panelTitle">Actions</div>

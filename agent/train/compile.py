@@ -11,7 +11,12 @@ import httpx
 
 from ..core.config import SETTINGS
 from ..dspy_modules.intent import IntentAnalysisAgent, ensure_dspy_configured
-from ..dspy_modules.recommender import FusionDecisionMaker, ProductRanker, RelaxedConstraintsGenerator
+from ..dspy_modules.recommender import (
+    FusionDecisionMaker,
+    ProductRanker,
+    RelaxedConstraintsGenerator,
+    coerce_relaxed_candidates,
+)
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -51,14 +56,19 @@ def compile_relaxed_constraints(dataset_path: Path, out_path: Path) -> None:
             "Collect more logs/feedback first."
         )
 
+    def metric(example, pred, trace=None):
+        pred_candidates = coerce_relaxed_candidates(getattr(pred, "candidates", pred))
+        label_candidates = getattr(example, "candidates", {}).get("candidates", [])
+        return _hit_rate(pred_candidates, label_candidates, k=10)
+
     # MIPROv2가 있으면 우선 사용
     tele = getattr(dspy.teleprompt, "MIPROv2", None)
     if tele is None:
         tele = dspy.teleprompt.BootstrapFewShotWithRandomSearch
-        optimizer = tele(max_bootstrapped_demos=6, num_candidate_programs=8)
+        optimizer = tele(metric=metric, max_bootstrapped_demos=6, num_candidate_programs=8)
     else:
         # MIPROv2는 valset이 없으면 trainset >= 2 필요(이미 체크)
-        optimizer = tele(metric=None, max_bootstrapped_demos=6, num_threads=1)
+        optimizer = tele(metric=metric, max_bootstrapped_demos=6, num_threads=1)
 
     compiled = optimizer.compile(program, trainset=examples)
     out_path.parent.mkdir(parents=True, exist_ok=True)

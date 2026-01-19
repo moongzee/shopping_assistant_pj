@@ -1,14 +1,14 @@
 :root {
   color-scheme: light;
-  --bg: #0b1020;
-  --panel: rgba(255, 255, 255, 0.06);
-  --panel2: rgba(255, 255, 255, 0.09);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.65);
-  --border: rgba(255, 255, 255, 0.12);
-  --accent: #7c5cff;
-  --good: #34d399;
-  --bad: #fb7185;
+  --bg: #f5f3ef;
+  --panel: #fbfaf8;
+  --panel2: #f1ede7;
+  --text: #2d2a26;
+  --muted: #7b736a;
+  --border: #e4ddd3;
+  --accent: #2d2a26;
+  --good: #3e9f7a;
+  --bad: #c96b6b;
 }
 
 * {
@@ -22,12 +22,10 @@ body {
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 700px at 20% 10%, rgba(124, 92, 255, 0.28), transparent 60%),
-    radial-gradient(900px 600px at 80% 20%, rgba(52, 211, 153, 0.14), transparent 60%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji,
-    Segoe UI Emoji;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", ui-sans-serif,
+    system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
 }
 
 a {
@@ -41,28 +39,61 @@ code {
 }
 
 .container {
-  max-width: 1240px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 18px 24px 24px;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.header {
+.header,
+.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  padding: 6px 4px;
 }
 
-.brand {
+.topbarSide {
+  font-size: 14px;
+  color: var(--muted);
+  min-width: 120px;
+}
+
+.topbarBrand {
   display: flex;
-  gap: 10px;
   align-items: baseline;
+  gap: 6px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  font-size: 22px;
 }
 
-.brand h1 {
-  margin: 0;
-  font-size: 18px;
-  letter-spacing: 0.2px;
+.topbarBrand .beta {
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.topbarButton {
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 4px 0 16px;
 }
 
 .pill {
@@ -70,38 +101,82 @@ code {
   background: var(--panel);
   padding: 6px 10px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 16px;
+  grid-template-columns: 460px 1fr;
+  gap: 24px;
+  height: calc(100vh - 150px);
+}
+
+.gridEqual {
+  grid-template-columns: 1fr 1fr;
 }
 
 .panel {
   border: 1px solid var(--border);
   background: var(--panel);
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-shadow: 0 4px 16px rgba(45, 42, 38, 0.06);
 }
 
 .panelHeader {
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .panelTitle {
   font-size: 13px;
   color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
 }
 
 .panelBody {
-  padding: 14px;
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.productPanelBody {
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.productPanelContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+}
+
+.productPanelHeader {
+  flex-shrink: 0;
+}
+
+.productPanelActions {
+  margin-top: 6px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .row {
@@ -112,18 +187,18 @@ code {
 .input {
   width: 100%;
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.22);
+  background: #fffdf9;
   color: var(--text);
-  border-radius: 12px;
-  padding: 12px 12px;
+  border-radius: 999px;
+  padding: 12px 14px;
   outline: none;
 }
 
 .button {
-  border: 1px solid rgba(124, 92, 255, 0.55);
-  background: rgba(124, 92, 255, 0.22);
+  border: 1px solid var(--border);
+  background: var(--panel);
   color: var(--text);
-  border-radius: 12px;
+  border-radius: 999px;
   padding: 12px 14px;
   cursor: pointer;
   white-space: nowrap;
@@ -138,16 +213,19 @@ code {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 560px;
   overflow: auto;
   padding-right: 6px;
+  flex: 1;
+  min-height: 0;
 }
 
 .chatWindow {
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 14px;
+  background: #fffdf9;
+  border-radius: 16px;
   padding: 12px;
+  flex: 1;
+  min-height: 0;
 }
 
 .emptyChat {
@@ -175,26 +253,29 @@ code {
   justify-content: center;
   font-size: 11px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--panel2);
   border: 1px solid var(--border);
 }
 
 .msgBubble {
   max-width: 78%;
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  background: #fffdf9;
+  box-shadow: 0 2px 8px rgba(45, 42, 38, 0.04);
 }
 
 .msgBubble.user {
-  background: rgba(124, 92, 255, 0.18);
-  border-color: rgba(124, 92, 255, 0.45);
+  background: #e7dfd5;
+  border-color: #d8cfc4;
+  color: #2d2a26;
 }
 
 .msgBubble.assistant {
-  background: rgba(0, 0, 0, 0.24);
+  background: #fbf6ee;
+  width: 420px;
+  max-width: 420px;
 }
 
 .msgRole {
@@ -213,8 +294,8 @@ code {
   margin: 6px 0 8px;
   padding: 6px 8px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--panel2);
+  border: 1px solid var(--border);
 }
 
 .stateLabel {
@@ -239,13 +320,14 @@ code {
 }
 
 .stateGroups {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
 .stateGroup {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border);
+  background: var(--panel);
   border-radius: 12px;
   padding: 8px;
 }
@@ -264,15 +346,15 @@ code {
 
 .stateEmpty {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--muted);
 }
 
 .spinner {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: rgba(124, 92, 255, 0.9);
+  border: 2px solid rgba(125, 115, 106, 0.3);
+  border-top-color: #7b736a;
   animation: spin 0.9s linear infinite;
 }
 
@@ -283,10 +365,12 @@ code {
 }
 
 .composer {
-  background: rgba(0, 0, 0, 0.22);
+  background: #fffdf9;
   border: 1px solid var(--border);
   padding: 8px;
-  border-radius: 14px;
+  border-radius: 999px;
+  margin-top: 10px;
+  flex-shrink: 0;
 }
 
 .statusList {
@@ -306,8 +390,19 @@ code {
 
 .products {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.productsScroll {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
 }
 
 .groupTitle {
@@ -318,17 +413,18 @@ code {
 
 .card {
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 14px;
+  background: #fffdf9;
+  border-radius: 16px;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: 96px 1fr;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 6px 16px rgba(45, 42, 38, 0.08);
 }
 
 .thumb {
-  width: 96px;
-  height: 96px;
-  background: rgba(255, 255, 255, 0.05);
+  width: 100%;
+  height: 220px;
+  background: var(--panel2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -336,8 +432,99 @@ code {
   font-size: 12px;
 }
 
+.compactMeta {
+  display: grid;
+  gap: 4px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(45, 42, 38, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.modalCard {
+  width: min(760px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(45, 42, 38, 0.2);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modalTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modalBody {
+  padding: 16px;
+  overflow: auto;
+}
+
+.modalGrid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+}
+
+.modalImage {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  overflow: hidden;
+}
+
+.modalImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modalImageEmpty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.modalInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modalName {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modalMeta {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .cardBody {
-  padding: 10px 12px;
+  padding: 8px 10px 10px;
 }
 
 .cardTitle {
@@ -363,7 +550,7 @@ code {
 
 .link {
   font-size: 12px;
-  color: rgba(124, 92, 255, 0.95);
+  color: #111827;
   text-decoration: underline;
 }
 

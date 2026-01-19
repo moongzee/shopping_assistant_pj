@@ -152,48 +152,20 @@ def _extract_style_codes_from_rows(rows: List[dict]) -> List[str]:
     return style_codes
 
 
-def _summarize_review_text_fallback(text: str, max_chars: int = 150) -> str:
-    cleaned = " ".join(text.strip().split())
-    if not cleaned:
-        return ""
-    if len(cleaned) <= max_chars:
-        return cleaned
-    truncated = cleaned[:max_chars]
-    if " " in truncated:
-        truncated = truncated.rsplit(" ", 1)[0]
-    return truncated + "…"
-
 
 def _process_unstructured_results(payload: Any) -> tuple[List[str], List[str], str]:
     style_codes: List[str] = []
-    summaries: List[str] = []
     entries = payload
     if isinstance(payload, dict) and "results" in payload:
         entries = payload["results"]
-    if not isinstance(entries, list):
-        return style_codes, summaries, ""
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        code = (
-            entry.get("STYLE_CODE")
-            or entry.get("style_code")
-            or entry.get("StyleCode")
-            or entry.get("styleCode")
-        )
-        if code and isinstance(code, str):
-            style_codes.append(code)
-        review_text = (
-            entry.get("TOTAL_STYLE_REVIEWS")
-            or entry.get("total_style_reviews")
-            or entry.get("Total_Style_Reviews")
-            or ""
-        )
-        summary = _summarize_review_text_fallback(str(review_text))
-        if summary:
-            summaries.append(summary)
-    aggregated = "\n".join(summaries[:5])
-    return style_codes, summaries, aggregated
+    if isinstance(entries, str):
+        matches = re.findall(r"style_code\s*:\s*([A-Za-z0-9_-]+)", entries, flags=re.IGNORECASE)
+        if matches:
+            style_codes.extend(matches)
+            style_codes = list(dict.fromkeys(style_codes))
+        
+    return style_codes, entries
+
 
 
 async def execute_cortex_analyst_sql(constraints: str) -> dict:
@@ -233,44 +205,21 @@ async def execute_cortex_search_rag(
     service_name: str = SETTINGS.mcp_cortex_search_service_name,
     database_name: str = SETTINGS.mcp_cortex_search_database_name,
     schema_name: str = SETTINGS.mcp_cortex_search_schema_name,
-    columns: Optional[List[str]] = None,
-    style_code_filter: Optional[List[str]] = None,
 ) -> dict:
-    if columns is None:
-        columns = SETTINGS.mcp_cortex_search_columns
-
-    if isinstance(columns, str):
-        resolved_columns = [col.strip() for col in columns.split(",") if col.strip()]
-    elif isinstance(columns, list):
-        resolved_columns = columns
-    else:
-        resolved_columns = [str(columns)]
 
     payload: dict = {
         "service_name": service_name,
         "database_name": database_name,
         "schema_name": schema_name,
         "query": query,
-        "columns": resolved_columns,
-        "limit": 10,
     }
-    if style_code_filter:
-        payload["filter_query"] = {
-            "@or": [{"@eq": {"STYLE_CODE": code}} for code in style_code_filter if code]
-        }
 
     raw_result = await call_mcp_tool_http(SETTINGS.mcp_cortex_search_tool, payload)
     payload_obj = coerce_mcp_payload(raw_result)
 
-    results_rows = (
-        payload_obj.get("results") if isinstance(payload_obj, dict) else _normalize_tool_result(payload_obj)
-    )
-    style_codes, summaries, review_summary = _process_unstructured_results(payload_obj)
+    style_codes, review_text = _process_unstructured_results(payload_obj)
     return {
-        "rows": results_rows,
         "style_codes": style_codes,
-        "summaries": summaries,
-        "review_summary": review_summary,
-        "raw_data": payload_obj,
+        "review_text": review_text
     }
 
