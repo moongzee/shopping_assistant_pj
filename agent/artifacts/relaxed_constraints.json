@@ -1,0 +1,40 @@
+{
+  "prog.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Given the fields `user_query`, `strict_constraints`, `brand_hint`, produce the fields `candidates`.",
+      "fields": [
+        {
+          "prefix": "User Query:",
+          "description": "사용자 원문 질문"
+        },
+        {
+          "prefix": "Strict Constraints:",
+          "description": "현재 정형검색 제약(결과 0개 가능)"
+        },
+        {
+          "prefix": "Brand Hint:",
+          "description": "추출된 브랜드 힌트(없으면 빈 문자열)"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Candidates:",
+          "description": "완화된 정형검색 제약 후보"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

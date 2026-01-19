@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List, NotRequired, TypedDict
+from typing import Any, Dict, List, NotRequired, Set, TypedDict
 
 import anyio
 from langgraph.checkpoint.memory import MemorySaver
@@ -59,6 +59,8 @@ class ShoppingState(TypedDict):
     fusion_decision: NotRequired[dict]
     recommended_style_codes: NotRequired[List[str]]
     recommended_products: NotRequired[List[dict]]
+    merged_products: NotRequired[List[dict]]
+    merged_style_codes: NotRequired[List[str]]
 
     # Composer output ("표현"만)
     llm_text: NotRequired[str]
@@ -105,6 +107,85 @@ def _pick_products_by_style_codes(products: List[dict], style_codes: List[str]) 
         if p:
             picked.append(p)
     return picked
+
+
+def _merge_products_by_style_code(primary: List[dict], extra: List[dict]) -> List[dict]:
+    merged: List[dict] = []
+    seen: Set[str] = set()
+    for p in primary + extra:
+        if not isinstance(p, dict):
+            continue
+        code = p.get("style_code") or p.get("STYLE_CODE")
+        if not isinstance(code, str) or not code:
+            continue
+        if code in seen:
+            continue
+        seen.add(code)
+        merged.append(p)
+    return merged
+
+
+def _extract_style_codes_from_products(products: List[dict]) -> List[str]:
+    codes: List[str] = []
+    seen: Set[str] = set()
+    for p in products:
+        if not isinstance(p, dict):
+            continue
+        code = p.get("style_code") or p.get("STYLE_CODE")
+        if isinstance(code, str) and code and code not in seen:
+            seen.add(code)
+            codes.append(code)
+    return codes
+
+
+def _chunk_list(items: List[str], size: int) -> List[List[str]]:
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+async def _fetch_products_by_style_codes(style_codes: List[str]) -> List[dict]:
+    cleaned: List[str] = []
+    seen: Set[str] = set()
+    for code in style_codes:
+        if not isinstance(code, str):
+            continue
+        code = code.strip()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        cleaned.append(code)
+    if not cleaned:
+        return []
+
+    chunks = _chunk_list(cleaned, 40)
+    results: List[dict] = []
+
+    async def _extend_rows(constraint: str) -> bool:
+        try:
+            r = await execute_cortex_analyst_sql(constraint)
+            rows = r.get("rows", [])
+            if isinstance(rows, list) and rows:
+                results.extend(rows)
+                return True
+        except Exception:
+            return False
+        return False
+
+    for chunk in chunks:
+        escaped = [c.replace("'", "''") for c in chunk]
+        quoted = ", ".join([f"'{c}'" for c in escaped])
+        # 1) 우선 SQL 스타일 조건
+        ok = await _extend_rows(f"STYLE_CODE in ({quoted})")
+        if ok:
+            continue
+        # 2) 케이스 민감도/모델 차이 대비
+        ok = await _extend_rows(f"style_code in ({quoted})")
+        if ok:
+            continue
+        # 3) 자연어 제약(한국어) fallback
+        for code in chunk:
+            await _extend_rows(f"스타일코드가 '{code}'인 상품")
+
+    return results
 
 
 def _fallback_recommend_products(products: List[dict], k: int = 30) -> List[dict]:
@@ -229,27 +310,46 @@ async def unstructured_query_node(state: ShoppingState) -> dict:
     service_name = state.get("cortex_service_name", SETTINGS.mcp_cortex_search_service_name)
     database_name = state.get("cortex_database_name", SETTINGS.mcp_cortex_search_database_name)
     schema_name = state.get("cortex_schema_name", SETTINGS.mcp_cortex_search_schema_name)
-    columns = state.get("cortex_columns", SETTINGS.mcp_cortex_search_columns)
-    structured_codes = state.get("structured_style_codes", [])
 
     results = await execute_cortex_search_rag(
         keywords,
         service_name=service_name,
         database_name=database_name,
-        schema_name=schema_name,
-        columns=columns,
-        style_code_filter=structured_codes,
+        schema_name=schema_name
     )
     return {
-        "unstructured_data": results.get("rows", []),
+        "unstructured_data": [],
         "unstructured_style_codes": results.get("style_codes", []),
-        "unstructured_reviews_summary": results.get("review_summary", ""),
+        "unstructured_reviews_summary": results.get("review_text", ""),
+    }
+
+
+async def merge_results_node(state: ShoppingState) -> dict:
+    structured_products = state.get("structured_data", [])
+    structured_codes = state.get("structured_style_codes", []) or _extract_style_codes_from_products(
+        structured_products
+    )
+    unstructured_codes = state.get("unstructured_style_codes", [])
+
+    structured_code_set = {c for c in structured_codes if isinstance(c, str)}
+    missing_codes = [
+        c for c in unstructured_codes if isinstance(c, str) and c and c not in structured_code_set
+    ]
+    extra_products: List[dict] = []
+    if missing_codes:
+        extra_products = await _fetch_products_by_style_codes(missing_codes)
+
+    merged_products = _merge_products_by_style_code(structured_products, extra_products)
+    merged_style_codes = _extract_style_codes_from_products(merged_products)
+    return {
+        "merged_products": merged_products,
+        "merged_style_codes": merged_style_codes,
     }
 
 
 async def result_fusion_node(state: ShoppingState) -> dict:
     ensure_dspy_configured()
-    products = state.get("structured_data", [])
+    products = state.get("merged_products") or state.get("structured_data", [])
     query = state["user_query"]
     reviews_summary = state.get("unstructured_reviews_summary", "")
     review_style_codes = state.get("unstructured_style_codes", [])
@@ -280,6 +380,28 @@ async def result_fusion_node(state: ShoppingState) -> dict:
 
     rec_codes = [c for c in rec_codes if isinstance(c, str) and c]
     rec_products = _pick_products_by_style_codes(products, rec_codes)
+    if products and rec_products:
+        # 보유 상품 풀에서 부족한 추천 수를 보정(최대 30개)
+        target_k = 30
+        if len(rec_products) < target_k:
+            seen_codes: Set[str] = set()
+            for p in rec_products:
+                if not isinstance(p, dict):
+                    continue
+                code = p.get("style_code") or p.get("STYLE_CODE")
+                if isinstance(code, str) and code:
+                    seen_codes.add(code)
+            for p in products:
+                if not isinstance(p, dict):
+                    continue
+                code = p.get("style_code") or p.get("STYLE_CODE")
+                if isinstance(code, str) and code and code in seen_codes:
+                    continue
+                rec_products.append(p)
+                if isinstance(code, str) and code:
+                    seen_codes.add(code)
+                if len(rec_products) >= target_k:
+                    break
     return {
         "fusion_decision": {
             "recommended_style_codes": rec_codes,
@@ -294,7 +416,7 @@ async def result_fusion_node(state: ShoppingState) -> dict:
 async def response_composer_node(state: ShoppingState) -> dict:
     ensure_dspy_configured()
     query = state["user_query"]
-    products = state.get("structured_data", [])
+    products = state.get("merged_products") or state.get("structured_data", [])
 
     rec_products = state.get("recommended_products", [])
     if not rec_products and products:
@@ -308,7 +430,6 @@ async def response_composer_node(state: ShoppingState) -> dict:
             rec_products = _pick_products_by_style_codes(products, codes)
         if not rec_products:
             rec_products = _fallback_recommend_products(products, k=30)
-
     decision = state.get("fusion_decision", {})
 
     grouped: dict[str, List[dict]] = {}
@@ -372,13 +493,16 @@ def build_graph():
     workflow.add_node("intent_agent", intent_analysis_node)
     workflow.add_node("structured_agent", structured_query_node)
     workflow.add_node("unstructured_agent", unstructured_query_node)
+    workflow.add_node("merge_agent", merge_results_node)
     workflow.add_node("fusion_agent", result_fusion_node)
     workflow.add_node("composer", response_composer_node)
 
     workflow.set_entry_point("intent_agent")
     workflow.add_edge("intent_agent", "structured_agent")
-    workflow.add_edge("structured_agent", "unstructured_agent")
-    workflow.add_edge("unstructured_agent", "fusion_agent")
+    workflow.add_edge("intent_agent", "unstructured_agent")
+    workflow.add_edge("structured_agent", "merge_agent")
+    workflow.add_edge("unstructured_agent", "merge_agent")
+    workflow.add_edge("merge_agent", "fusion_agent")
     workflow.add_edge("fusion_agent", "composer")
     workflow.add_edge("composer", END)
 

@@ -1,0 +1,40 @@
+{
+  "prog.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Given the fields `user_query`, `conversation_history`, `products_json`, produce the fields `recommended_style_codes`.",
+      "fields": [
+        {
+          "prefix": "User Query:",
+          "description": "사용자 질문"
+        },
+        {
+          "prefix": "Conversation History:",
+          "description": "멀티턴 히스토리(없으면 빈 문자열)"
+        },
+        {
+          "prefix": "Products Json:",
+          "description": "상품 후보 목록(JSON list)"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Recommended Style Codes:",
+          "description": "추천 style_code 순서"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}

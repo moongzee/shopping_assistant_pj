@@ -36,10 +36,10 @@ uv.lock
 
 # --- Backend runtime data (generated) ---
 # chat/feedback 로그 및 생성 데이터셋은 기본적으로 커밋하지 않음
-agent/data/logs/
-agent/data/datasets/
-agent/data/curation/
+# agent/data/logs/
+# agent/data/datasets/
+# agent/data/curation/
 
 # --- DSPy artifacts (generated) ---
-agent/artifacts/
+# agent/artifacts/
 

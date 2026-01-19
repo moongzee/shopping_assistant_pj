@@ -67,9 +67,6 @@ class Settings:
     mcp_cortex_search_service_name: str = _env("MCP_CORTEX_SEARCH_SERVICE_NAME")
     mcp_cortex_search_database_name: str = _env("MCP_CORTEX_SEARCH_DATABASE_NAME")
     mcp_cortex_search_schema_name: str = _env("MCP_CORTEX_SCHEMA_NAME")
-    mcp_cortex_search_columns: List[str] = field(
-        default_factory=lambda: _env_list("MCP_CORTEX_SEARCH_COLUMNS", ["TOTAL_STYLE_REVIEWS", "STYLE_CODE"])
-    )
 
     mcp_cortex_analyst_url: str = _env(
         "MCP_CORTEX_ANALYST_URL"

@@ -9,6 +9,7 @@ dependencies = [
   "dspy",
   "fastapi",
   "langgraph",
+  "langsmith",
   "mcp",
   "pydantic",
   "python-dotenv",

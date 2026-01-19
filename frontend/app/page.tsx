@@ -4,12 +4,13 @@ import ChatClient from "@/components/ChatClient";
 export default function Page() {
   return (
     <>
-      <div className="header">
-        <div className="brand">
-          <h1>Shopping Assistant Demo</h1>
-          <span className="pill">LangGraph 진행상태 + 스트리밍 + 상품 카드</span>
+      <div className="topbar">
+        <div className="topbarSide">Fashion</div>
+        <div className="topbarBrand">
+          <span>Shopping assistant</span>
+          <span className="beta">beta</span>
         </div>
-        <Link className="pill" href="/admin">
+        <Link className="topbarButton" href="/admin">
           학습/최적화 대시보드 →
         </Link>
       </div>

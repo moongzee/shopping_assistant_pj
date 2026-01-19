@@ -1,0 +1,48 @@
+{
+  "prog.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Given the fields `user_query`, `conversation_history`, `products_json`, `reviews_summary`, `review_style_codes_json`, produce the fields `decision`.",
+      "fields": [
+        {
+          "prefix": "User Query:",
+          "description": "사용자 질문"
+        },
+        {
+          "prefix": "Conversation History:",
+          "description": "멀티턴 히스토리(없으면 빈 문자열)"
+        },
+        {
+          "prefix": "Products Json:",
+          "description": "상품 후보 목록(JSON list)"
+        },
+        {
+          "prefix": "Reviews Summary:",
+          "description": "리뷰 요약 텍스트(없으면 빈 문자열)"
+        },
+        {
+          "prefix": "Review Style Codes Json:",
+          "description": "리뷰 style_code 후보(JSON list)"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Decision:",
+          "description": "추천 style_code + 근거/주의사항"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}
