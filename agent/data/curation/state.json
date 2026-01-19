@@ -1,0 +1,18 @@
+{
+  "excluded_message_ids": [
+    "625540d6-8416-426a-9780-39118662674d",
+    "763c98dc-4a83-4fbe-b954-64503494a92c",
+    "c335bb14-270c-4e87-a3f3-18e716408f44",
+    "fff7b42f-42ba-45f8-bee7-1755743e4629"
+  ],
+  "quality_labels": {
+    "6890092e-29b2-4f4e-9eed-47a12af28e76": "good",
+    "e44ce48c-1db3-4062-9fe2-ddefa817e206": "good",
+    "194c1089-355b-424c-86d8-18042dfc97f0": "good",
+    "b9777218-eb80-47e3-86db-93c269de6dee": "good",
+    "c8360eb8-44f9-4953-b693-3c8703ae1abb": "good",
+    "89e6934a-9e3a-4a06-9495-3ac4cd8b2be0": "good",
+    "fb881b96-a243-4d48-a52c-3264c971ad61": "good"
+  },
+  "updated_at": "2026-01-19T06:21:02.609175+00:00"
+}
