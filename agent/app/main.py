@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 from fastapi import FastAPI
@@ -13,6 +14,9 @@ from .routes_chat import router as chat_router
 
 # Use uvicorn's logger so it shows up in container logs by default.
 logger = logging.getLogger("uvicorn.error")
+API_DEBUG = os.getenv("API_DEBUG", "").strip().lower() == "true"
+API_DEBUG_BODY = os.getenv("API_DEBUG_BODY", "").strip().lower() == "true"
+MAX_BODY_LOG = int(os.getenv("API_DEBUG_MAX_BODY", "2000") or "2000")
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Shopping Assistant Agent API", version="0.2.0")
@@ -22,6 +26,25 @@ def create_app() -> FastAPI:
         t0 = time.time()
         logger.info("REQ start %s %s", request.method, request.url.path)
         try:
+            if API_DEBUG:
+                body_preview = ""
+                if request.method in {"POST", "PUT", "PATCH"}:
+                    body = await request.body()
+                    if API_DEBUG_BODY and body:
+                        body_text = body.decode("utf-8", errors="replace")
+                        body_preview = (
+                            f"{body_text[:MAX_BODY_LOG]}...<truncated>"
+                            if len(body_text) > MAX_BODY_LOG
+                            else body_text
+                        )
+                logger.info(
+                    "REQ detail %s %s query=%s content-type=%s body=%s",
+                    request.method,
+                    request.url.path,
+                    dict(request.query_params),
+                    request.headers.get("content-type"),
+                    body_preview,
+                )
             resp = await call_next(request)
             return resp
         finally:
