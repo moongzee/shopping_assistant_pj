@@ -43,3 +43,4 @@ uv.lock
 # --- DSPy artifacts (generated) ---
 # agent/artifacts/
 
+.references/

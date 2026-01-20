@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { parseSseStream } from "@/lib/sse";
 
 type ChatStep = { category: string; label: string };
@@ -51,7 +52,12 @@ function buildStepLabel(node: string, keys: string[]) {
 }
 
 export default function ChatClient() {
-  const [sessionId, setSessionId] = useState<string>("demo-session");
+  const [sessionId, setSessionId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("chat-session-id") || "demo-session";
+    }
+    return "demo-session";
+  });
   const [input, setInput] = useState<string>("");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -65,8 +71,9 @@ export default function ChatClient() {
   const [savingFeedback, setSavingFeedback] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const debugEnabled =
-    String(process.env.NEXT_PUBLIC_API_DEBUG || "").trim() === "true";
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  
+  const debugEnabled = String(process.env.NEXT_PUBLIC_API_DEBUG || "").trim() === "true";
 
   function debugLog(message: string, payload?: Record<string, any>) {
     if (!debugEnabled) return;
@@ -80,8 +87,25 @@ export default function ChatClient() {
   }, [finalMeta]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }, [messages, busy]);
+
+  // 세션 스토리지에 세션 ID 저장
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("chat-session-id", sessionId);
+    }
+  }, [sessionId]);
+
+  // Textarea 자동 높이 조절
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [input]);
 
   function toggleSelect(styleCode: string) {
     setFeedbackMsg(null);
@@ -125,7 +149,6 @@ export default function ChatClient() {
           selected_style_codes: codes,
         }),
       });
-      debugLog("[feedback] response", { status: r.status, ok: r.ok });
       if (!r.ok) throw new Error(`feedback_failed: ${r.status}`);
       setSavedStyleCodes((prev) => new Set([...Array.from(prev), ...codes]));
       setFeedbackMsg(`피드백 저장 완료 (${codes.length}개)`);
@@ -169,24 +192,16 @@ export default function ChatClient() {
     });
 
     try {
-      // IMPORTANT:
-      // - 기본값은 Next API 프록시(`/api/chat/stream`) 사용 (Docker/배포 환경에서 안전)
-      // - "직접 백엔드 호출"은 명시적으로 켠 경우에만 사용 (프록시 버퍼링 회피 목적)
       const useDirect = String(process.env.NEXT_PUBLIC_USE_DIRECT_BACKEND || "").trim() === "true";
       const directBase = useDirect ? (process.env.NEXT_PUBLIC_AGENT_BASE_URL || "").trim() : "";
       const url = directBase ? `${directBase}/v1/chat/stream` : "/api/chat/stream";
-      debugLog("[chat] request", {
-        url,
-        session_id: sessionId,
-        user_query: q,
-        useDirect,
-      });
+      
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, user_query: q }),
       });
-      debugLog("[chat] response", { status: res.status, ok: res.ok });
+      
       if (!res.ok || !res.body) throw new Error(`bad_response: ${res.status}`);
 
       for await (const evt of parseSseStream(res.body)) {
@@ -242,266 +257,134 @@ export default function ChatClient() {
     }
   }
 
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  }
+
+  const isInitial = messages.length === 0;
+
   return (
     <div className="grid">
-      <div className="panel">
-        <div className="panelHeader">
-          <div className="panelTitle">채팅 (스트리밍) + LangGraph 상태</div>
-          <div className="pill">session: {sessionId}</div>
-        </div>
-        <div className="panelBody">
-          <div className="row" style={{ marginBottom: 10 }}>
-            <input
-              className="input"
-              value={sessionId}
-              onChange={(e) => setSessionId(e.target.value)}
-              placeholder="session_id"
-            />
+      <div className={`chatPanel ${isInitial ? "centered" : ""}`}>
+        {!isInitial && (
+          <div className="panelHeader">
+            <div className="panelTitle">AI 쇼핑 분석</div>
+            <div className="pill">ID: {sessionId}</div>
           </div>
-
-          <div className="messages chatWindow" style={{ marginBottom: 12 }}>
-            {messages.length === 0 ? (
-              <div className="emptyChat">
-                대화를 시작해 보세요. 아래 입력창에 질문을 입력하면 스트리밍으로 답변이 표시됩니다.
-              </div>
-            ) : null}
-            {messages.map((m, i) => {
-              const hasSteps = m.role === "assistant" && (m.steps?.length ?? 0) > 0;
-              const isDone = m.role === "assistant" && m.done;
-              const groupedSteps = hasSteps
-                ? (m.steps ?? []).reduce<Record<string, string[]>>((acc, step) => {
-                    if (!acc[step.category]) acc[step.category] = [];
-                    acc[step.category].push(step.label);
-                    return acc;
-                  }, {})
-                : {};
-              const visibleStages = hasSteps
-                ? STAGE_ORDER.filter(
-                    (stage) =>
-                      (groupedSteps[stage] && groupedSteps[stage].length) ||
-                      stage === m.currentStage,
-                  )
-                : [];
-              return (
-                <div key={i} className={`msgRow ${m.role}`}>
-                  <div className="msgAvatar">{m.role === "user" ? "You" : "AI"}</div>
-                  <div className={`msgBubble ${m.role}`}>
-                    <div className="msgRole">{m.role === "user" ? "사용자" : "어시스턴트"}</div>
-                    {hasSteps ? (
-                      <div className="stateInline">
-                        <div className="stateLabel">진행 단계</div>
-                        <div className="stateGroups">
-                          {visibleStages.map((category) => {
-                            const items = groupedSteps[category] ?? [];
-                            const isActive = !isDone && m.currentStage === category;
-                            return (
-                            <div key={category} className="stateGroup">
-                              <div className="stateGroupHeader">
-                                {isActive ? <span className="spinner" aria-hidden /> : null}
-                                <span className="stateGroupTitle">{category}</span>
-                              </div>
-                              {items.length ? (
-                                <div className="stateBadges">
-                                  {items.slice(-6).map((step, idx) => (
-                                    <span key={`${step}-${idx}`} className="stateBadge">
-                                      {step}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="stateEmpty">대기중</div>
-                              )}
-                            </div>
-                          );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                    <div className="msgText">{m.text}</div>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="row composer">
-            <input
-              className="input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") send();
-              }}
-              placeholder="예) 로엠 따뜻하고 편한 기모 긴팔 추천해줘"
-            />
-            <button className="button" onClick={send} disabled={busy}>
-              {busy ? "생성중..." : "전송"}
-            </button>
-          </div>
-
-          <div style={{ marginTop: 6 }} />
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panelHeader">
-          <div className="panelTitle">추천 상품 카드</div>
-          <div className="pill">
-            {finalMeta
-              ? `style_codes: ${(finalMeta?.recommended_style_codes ?? []).length}`
-              : "대기중"}
-          </div>
-        </div>
-        <div className="panelBody">
-          {!finalMeta ? (
-            <div className="small">
-              채팅을 보내면, `final` 이벤트에서 상품 메타를 받아 여기에 카드로 노출합니다.
+        )}
+        
+        <div className="chatWindow">
+          {isInitial ? (
+            <div className="emptyChat">
+              <h2 style={{ fontSize: "32px", fontWeight: 700, marginBottom: "16px" }}>무엇을 도와드릴까요?</h2>
+              <p style={{ color: "var(--muted)", fontSize: "16px" }}>궁금한 스타일이나 상품을 물어보세요.</p>
             </div>
           ) : (
-            <div>
-              <div className="small">
-                message_id: <code>{messageId ?? "-"}</code>
-              </div>
-
-              <div className="row" style={{ marginTop: 10, alignItems: "center" }}>
-                <div className="small" style={{ flex: 1 }}>
-                  선택: {selectedStyleCodes.size}개 / 저장됨: {savedStyleCodes.size}개
-                </div>
-                <button
-                  className="button"
-                  style={{ padding: "8px 10px" }}
-                  onClick={clearSelection}
-                  disabled={savingFeedback || selectedStyleCodes.size === 0}
-                >
-                  선택 초기화
-                </button>
-                <button
-                  className="button"
-                  style={{
-                    padding: "8px 10px",
-                    borderColor: selectedStyleCodes.size ? "rgba(52, 211, 153, 0.55)" : undefined,
-                    background: selectedStyleCodes.size ? "rgba(52, 211, 153, 0.18)" : undefined,
-                  }}
-                  onClick={saveFeedback}
-                  disabled={savingFeedback || selectedStyleCodes.size === 0}
-                >
-                  {savingFeedback ? "저장중..." : "피드백 저장"}
-                </button>
-              </div>
-              {feedbackMsg ? (
-                <div className="small" style={{ marginTop: 8 }}>
-                  {feedbackMsg}
-                </div>
-              ) : null}
-
-              {recommended.length === 0 ? (
-                <div className="small" style={{ marginTop: 10 }}>
-                  recommended_products 가 비어있습니다.
-                </div>
-              ) : (
-                <div className="products">
-                  {recommended.map((p, idx) => {
-                    const styleCode = pick(p, "style_code", "STYLE_CODE");
-                    const code = styleCode ? String(styleCode) : "";
-                    const isSelected = !!code && selectedStyleCodes.has(code);
-                    const isSaved = !!code && savedStyleCodes.has(code);
-                    const title =
-                      pick(p, "product_name", "PRODUCT_NAME") ?? "(상품명 없음)";
-                    const brand = pick(p, "brand", "BRAND");
-                    const price = pick(p, "price", "PRICE");
-                    const material = pick(p, "material", "MATERIAL");
-                    const season = pick(p, "season", "SEASON");
-                    const channel = pick(p, "channel", "CHANNEL");
-                    const color = pick(p, "color", "COLOR");
-                    const size = pick(p, "size", "SIZE");
-                    const url = pick(p, "url", "URL");
-                    const imgRaw = pick(p, "image_url", "IMAGE_URL");
-                    const img = imgRaw ? String(imgRaw).replace(/\?$/, "") : undefined;
-
-                    return (
-                      <div key={`${styleCode ?? "x"}-${idx}`} className="card">
-                        <div className="thumb">
-                          {img ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={String(img)}
-                              alt={String(title)}
-                              style={{
-                                width: "96px",
-                                height: "96px",
-                                objectFit: "cover",
-                              }}
-                            />
-                          ) : (
-                            "NO IMG"
-                          )}
-                        </div>
-                        <div className="cardBody">
-                          <p className="cardTitle">{title}</p>
-                          <div className="meta">
-                            {brand ? <span>브랜드: {brand}</span> : null}
-                            {styleCode ? <span>style_code: {styleCode}</span> : null}
-                            {price ? <span>가격: {price}</span> : null}
-                            {season ? <span>시즌: {season}</span> : null}
-                            {channel ? <span>채널: {channel}</span> : null}
-                            {color ? <span>색상: {color}</span> : null}
-                            {size ? <span>사이즈: {size}</span> : null}
-                            {material ? (
-                              <span>소재: {String(material).slice(0, 24)}</span>
-                            ) : null}
-                            {isSaved ? <span style={{ color: "rgba(52, 211, 153, 0.9)" }}>저장됨</span> : null}
-                            {!isSaved && isSelected ? (
-                              <span style={{ color: "rgba(52, 211, 153, 0.9)" }}>선택됨</span>
-                            ) : null}
-                          </div>
-                          <div className="linkRow">
-                            {url ? (
-                              <a
-                                className="link"
-                                href={String(url)}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                상품 링크
-                              </a>
-                            ) : (
-                              <span className="small">링크 없음</span>
-                            )}
-                            {styleCode ? (
-                              <button
-                                className="button"
-                                style={{
-                                  padding: "8px 10px",
-                                  borderColor: isSelected
-                                    ? "rgba(52, 211, 153, 0.65)"
-                                    : isSaved
-                                      ? "rgba(124, 92, 255, 0.55)"
-                                      : undefined,
-                                  background: isSelected
-                                    ? "rgba(52, 211, 153, 0.18)"
-                                    : isSaved
-                                      ? "rgba(124, 92, 255, 0.16)"
-                                      : undefined,
-                                }}
-                                onClick={() => toggleSelect(String(styleCode))}
-                                disabled={savingFeedback}
-                              >
-                                {isSelected ? "선택 해제" : isSaved ? "저장됨" : "선택"}
-                              </button>
-                            ) : null}
+            <div className="messages">
+              {messages.map((m, i) => {
+                const hasSteps = m.role === "assistant" && (m.steps?.length ?? 0) > 0;
+                const isDone = m.role === "assistant" && m.done;
+                const groupedSteps = hasSteps ? (m.steps ?? []).reduce<Record<string, string[]>>((acc, step) => {
+                  if (!acc[step.category]) acc[step.category] = [];
+                  acc[step.category].push(step.label);
+                  return acc;
+                }, {}) : {};
+                const visibleStages = hasSteps ? STAGE_ORDER.filter(s => groupedSteps[s] || s === m.currentStage) : [];
+                
+                return (
+                  <div key={i} className={`msgRow ${m.role}`}>
+                    <div className="msgAvatar">{m.role === "user" ? "You" : "AI"}</div>
+                    <div className={`msgBubble ${m.role}`}>
+                      <div className="msgRole">{m.role === "user" ? "나" : "쇼핑 어시스턴트"}</div>
+                      {hasSteps && (
+                        <div className="stateInline">
+                          <div className="stateGroups">
+                            {visibleStages.map(cat => (
+                              <div key={cat} className="stateGroup">
+                                <div className="stateGroupHeader">
+                                  {!isDone && m.currentStage === cat && <span className="spinner" />}
+                                  <span className="stateGroupTitle">{cat}</span>
+                                </div>
+                                <div className="stateBadges">
+                                  {(groupedSteps[cat] || []).map((s, idx) => <span key={idx} className="stateBadge">{s}</span>)}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      )}
+                      <div className="msgText">{m.text}</div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>
+
+        <div className="composerWrapper">
+          <div className="composer">
+            <textarea ref={textareaRef} className="textarea" rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="어떤 상품을 찾으시나요?" />
+            <button className="button" onClick={send} disabled={busy}>
+              {busy ? (
+                "..."
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {!isInitial && (
+        <div className="panel productPanel">
+          <div className="panelHeader">
+            <div className="panelTitle">맞춤 추천 상품</div>
+            <div className="pill">{recommended.length}개</div>
+          </div>
+          <div className="panelBody" style={{ overflowY: "auto" }}>
+            {finalMeta ? (
+              <div className="products">
+                {recommended.map((p, idx) => {
+                  const code = pick(p, "style_code", "STYLE_CODE") || "";
+                  const img = pick(p, "image_url", "IMAGE_URL")?.replace(/\?$/, "");
+                  return (
+                    <div key={idx} className="card">
+                      <div className="thumb">{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "NO IMG"}</div>
+                      <div className="cardBody">
+                        <p className="cardTitle">{pick(p, "product_name", "PRODUCT_NAME")}</p>
+                        <div className="linkRow">
+                          <span className="small">{code}</span>
+                          <button className="button" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => toggleSelect(String(code))}>
+                            {selectedStyleCodes.has(String(code)) ? "해제" : savedStyleCodes.has(String(code)) ? "저장됨" : "선택"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <div className="small" style={{ textAlign: "center", padding: "20px" }}>상품을 분석 중입니다...</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
